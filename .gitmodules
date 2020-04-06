@@ -4,3 +4,9 @@
 [submodule "rkmh"]
 	path = rkmh
 	url = https://github.com/edawson/rkmh
+[submodule "pliib"]
+	path = pliib
+	url = https://github.com/edawson/pliib
+[submodule "kseqpp"]
+	path = kseqpp
+	url = https://github.com/cartoonist/kseqpp.git
