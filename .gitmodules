@@ -10,3 +10,6 @@
 [submodule "kseqpp"]
 	path = kseqpp
 	url = https://github.com/cartoonist/kseqpp.git
+[submodule "sparsepp"]
+	path = sparsepp
+	url = https://github.com/greg7mdp/sparsepp.git
