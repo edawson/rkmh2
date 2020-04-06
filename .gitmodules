@@ -1,3 +1,6 @@
 [submodule "mkmh"]
 	path = mkmh
-	url = https://github.com/edawson/mkmh
+	url = https://github.com/edawson/mkmhurl = https://github.com/edawson/mkmh
+[submodule "rkmh"]
+	path = rkmh
+	url = https://github.com/edawson/rkmh
