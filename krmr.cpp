@@ -87,7 +87,7 @@ struct read_t{
     char* qual = nullptr;
     char* comment = nullptr;
     std::size_t seqlen = 0;
-    hash_result hashes;
+    //hash_result hashes;
     read_t(){
 
     }
@@ -194,7 +194,7 @@ int main_filter(int argc, char** argv){
             for (std::size_t i = 0; i < rsize; ++i){
                 klibpp::KSeq rec = records[i];
                 pliib::strcopy(rec.name.c_str(), curr_ref_fi_reads[i].name);
-                pliib::strcopy(rec.seq.c_str(), curr_ref_fi_reads[i].seq);
+                //pliib::strcopy(rec.seq.c_str(), curr_ref_fi_reads[i].seq);
                 //curr_ref_fi_reads[i].seqlen = rec.seq.size();
                 //hash_sequence(curr_ref_fi_reads[i].seq,
                 //        curr_ref_fi_reads[i].seqlen,
