@@ -131,7 +131,6 @@ void usage(){
     std::cout << "krmr: Filter reads using MinHash." << std::endl;
     std::cout << "Usage: krmr -r <ref FASTA/FASTQ> -f <read FASTA/FASTQ> [options]" << std::endl;
     std ::cout << " options:" << std::endl;
-    std::cout << "    -P / --pair-qnames   [not yet implemented.]" << std::endl;
     std::cout << "    -N / --ambiguous   Allow N's to be hashed along with canonical [ACTG] nucleotides" << std::endl;
 }
 
@@ -146,6 +145,8 @@ int main_filter(int argc, char** argv){
     std::size_t min_length = 75;
     std::size_t sketch_size = 1000;
     std::size_t min_matches = 30;
+    std::size_t ref_batch = 10;
+    std::size_t read_batch = 1000;
     bool invert = false;
     // A hash_map to hold qname->read
     spp::sparse_hash_map<std::string, read_t> mate_cache;
@@ -158,9 +159,11 @@ int main_filter(int argc, char** argv){
         static struct option long_options[] =
         {
             {"help", no_argument, 0, 'h'},
-            {"fasta", required_argument, 0, 'f'},
+            {"fastq", required_argument, 0, 'f'},
             {"min-matches", required_argument, 0, 'm'},
             {"reference", required_argument, 0, 'r'},
+            {"ref-batch-size", required_argument, 0, 'R'},
+            {"fastq-batch-size", required_argument, 0, 'F'},
             {"min-length", required_argument, 0, 'l'},
             {"pair-qnames", required_argument, 0, 'q'},
             {"sketch-size", required_argument, 0, 's'},
@@ -172,7 +175,7 @@ int main_filter(int argc, char** argv){
         };
     
         int option_index = 0;
-        c = getopt_long(argc, argv, "hzm:s:r:f:q:t:l:Nv", long_options, &option_index);
+        c = getopt_long(argc, argv, "hzR:F:m:s:r:f:q:t:l:Nv", long_options, &option_index);
         if (c == -1){
             break;
         }
@@ -180,6 +183,12 @@ int main_filter(int argc, char** argv){
         switch (c){
             case 'r':
                 ref_files.push_back(optarg);
+                break;
+            case 'R':
+                ref_batch = std::atoi(optarg);
+                break;
+            case 'F':
+                read_batch = std::atoi(optarg);
                 break;
             case 'm':
                 min_matches = std::atoi(optarg);
@@ -229,7 +238,7 @@ int main_filter(int argc, char** argv){
     for(std::size_t i = 0; i < ref_files.size(); ++i){
        
         klibpp::SeqStreamIn iss(ref_files[i].c_str());
-        std::vector<klibpp::KSeq> records = iss.read(5);
+        std::vector<klibpp::KSeq> records = iss.read(ref_batch);
         while (!records.empty()){
             #ifdef DEBUG_KRMR
             std::cerr << " records size: " << records.size() << std::endl;
@@ -256,7 +265,7 @@ int main_filter(int argc, char** argv){
                 ref_seqs.insert(ref_seqs.end(), curr_ref_fi_reads.begin(), curr_ref_fi_reads.end());
                 ref_hashes.insert(ref_hashes.end(), curr_ref_fi_hashes.begin(), curr_ref_fi_hashes.end());
             }
-            records = iss.read(10);
+            records = iss.read(ref_batch);
         }
     }
 
@@ -270,7 +279,7 @@ int main_filter(int argc, char** argv){
     std::size_t total_reads = 0;
     for(std::size_t i = 0; i < read_files.size(); ++i){
         klibpp::SeqStreamIn rss(read_files[i].c_str());
-        std::vector<klibpp::KSeq> records = rss.read(4000);
+        std::vector<klibpp::KSeq> records = rss.read(read_batch);
         while (!records.empty()){
             std::size_t rsize = records.size();
             std::vector<read_t> curr_reads(rsize);
@@ -317,7 +326,7 @@ int main_filter(int argc, char** argv){
             }
             total_reads += rsize;
             std::cerr << "Processed " << total_reads << "  reads so far." << std::endl;
-            records = rss.read(4000);
+            records = rss.read(read_batch);
         }
     }
 
