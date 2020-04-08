@@ -14,7 +14,7 @@ debug-rkmh2: rkmh2.cpp mkmh/mkmh.hpp kseqpp/include/kseq++/config.hpp
 kseqpp/include/kseq++/config.hpp:
 	+cd kseqpp && cmake .
 
-test: kramer
+test: rkmh2
 	./rkmh2 filter -r data/zika.refs.fa -f data/z1.fq -t 1
 
 clean:
