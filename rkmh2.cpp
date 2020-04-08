@@ -300,6 +300,8 @@ int main_filter(int argc, char** argv){
                             st << std::endl;
                             //std::cout << records[i] << std::endl;;
                             std::cout << st.str();
+                            st.str("");
+                            break;
                         }
                     }
                 }
@@ -310,6 +312,7 @@ int main_filter(int argc, char** argv){
                         ", length: " << 
                         seq_len << std::endl;
                     std::cerr << st.str();
+                    st.str("");
                 }
             }
             total_reads += rsize;
