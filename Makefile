@@ -18,6 +18,7 @@ test: kramer
 	./rkmh2 filter -r data/zika.refs.fa -f data/z1.fq -t 1
 
 clean:
-	$(RM) kramer
+	$(RM) rkmh2
+	$(RM) debug-rkmh2
 
 .PHONY: test clean
