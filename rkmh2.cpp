@@ -146,6 +146,7 @@ int main_filter(int argc, char** argv){
     std::size_t min_length = 75;
     std::size_t sketch_size = 1000;
     std::size_t min_matches = 30;
+    bool invert = false;
     // A hash_map to hold qname->read
     spp::sparse_hash_map<std::string, read_t> mate_cache;
     std::vector<read_t> ref_seqs;
@@ -164,13 +165,14 @@ int main_filter(int argc, char** argv){
             {"pair-qnames", required_argument, 0, 'q'},
             {"sketch-size", required_argument, 0, 's'},
             {"ambiguous", no_argument, 0, 'N'},
+            {"invert", no_argument, 0, 'z'},
             {"version", no_argument, 0, 'v'},
             {"threads", required_argument, 0, 't'},
             {0,0,0,0}
         };
     
         int option_index = 0;
-        c = getopt_long(argc, argv, "hm:s:r:f:q:t:l:Nv", long_options, &option_index);
+        c = getopt_long(argc, argv, "hzm:s:r:f:q:t:l:Nv", long_options, &option_index);
         if (c == -1){
             break;
         }
@@ -187,6 +189,9 @@ int main_filter(int argc, char** argv){
                 break;
             case 'q':
                 pair_name_files.push_back(optarg);
+                break;
+            case 'z':
+                invert = true;
                 break;
             case 'N':
                 allow_ambiguous = true;
@@ -265,7 +270,7 @@ int main_filter(int argc, char** argv){
     std::size_t total_reads = 0;
     for(std::size_t i = 0; i < read_files.size(); ++i){
         klibpp::SeqStreamIn rss(read_files[i].c_str());
-        std::vector<klibpp::KSeq> records = rss.read(2000);
+        std::vector<klibpp::KSeq> records = rss.read(4000);
         while (!records.empty()){
             std::size_t rsize = records.size();
             std::vector<read_t> curr_reads(rsize);
@@ -289,7 +294,7 @@ int main_filter(int argc, char** argv){
                         mkmh::hash_intersection_size(ref_hashes[j].hashes, ref_hashes[j].num_hashes,
                                 curr_read_hashes.at(i).hashes, curr_read_hashes.at(i).num_hashes, inter);
                         //std::cerr << inter << std::endl;
-                        if (inter >= min_matches){
+                        if (invert ^ inter >= min_matches){
                             //std::cerr << "Record passed" << std::endl;
                             output_kseq(records.at(i), st);
                             st << std::endl;
@@ -309,7 +314,7 @@ int main_filter(int argc, char** argv){
             }
             total_reads += rsize;
             std::cerr << "Processed " << total_reads << "  reads so far." << std::endl;
-            records = rss.read(2000);
+            records = rss.read(4000);
         }
     }
 
