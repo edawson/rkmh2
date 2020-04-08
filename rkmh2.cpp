@@ -127,11 +127,18 @@ std::ostream& output_kseq(klibpp::KSeq& ks, std::ostream& os){
     return os;
 }
 
-void usage(){
-    std::cout << "krmr: Filter reads using MinHash." << std::endl;
-    std::cout << "Usage: krmr -r <ref FASTA/FASTQ> -f <read FASTA/FASTQ> [options]" << std::endl;
+void usage(char** argv){
+    std::cout << argv[1] << ": Filter reads using MinHash." << std::endl;
+    std::cout << "Usage:" << argv[1] << " <subcommand> -r <ref FASTA/FASTQ> -f <read FASTA/FASTQ> [options]" << std::endl;
     std ::cout << " options:" << std::endl;
-    std::cout << "    -N / --ambiguous   Allow N's to be hashed along with canonical [ACTG] nucleotides" << std::endl;
+    std::cout << "    -m / --min-matches <min>   The minimum number of matches a read must have to pass [75]." << std::endl;
+    std::cout << "    -t / --threads <threads>   The number of OpenMP threads to use [1]." << std::endl;
+    std::cout << "    -s / --sketch-size <sketch size>   The size of the MinHash sketch to use per ref/read [1000]." << std::endl;
+    std::cout << "    -k / --kmer-size <k>   The kmer size to use for hashing [16]" << std::endl;
+    std::cout << "    -N / --ambiguous   Allow N's to be hashed along with canonical [ACTG] nucleotides [false]." << std::endl;
+    std::cout << "    -z / --invert              Invert the query (i.e., return reads that *do not* match the references with min-matches) [false].." << std::endl;
+    std::cout << "    -R / --ref-batch-size <batch>   The number of reference sequences to hash at one time (increase for speed at the cost of more memory usage) [10]." << std::endl;
+    std::cout << "    -F / --fastq-batch-size <batch>   The number of read sequences to hash at one time (increase for speed at the cost of more memory usage) [1000]." << std::endl;
 }
 
 int main_filter(int argc, char** argv){
@@ -169,18 +176,22 @@ int main_filter(int argc, char** argv){
             {"sketch-size", required_argument, 0, 's'},
             {"ambiguous", no_argument, 0, 'N'},
             {"invert", no_argument, 0, 'z'},
+            {"kmer-size", required_argument, 0, 'k'},
             {"version", no_argument, 0, 'v'},
             {"threads", required_argument, 0, 't'},
             {0,0,0,0}
         };
     
         int option_index = 0;
-        c = getopt_long(argc, argv, "hzR:F:m:s:r:f:q:t:l:Nv", long_options, &option_index);
+        c = getopt_long(argc, argv, "hzk:R:F:m:s:r:f:q:t:l:Nv", long_options, &option_index);
         if (c == -1){
             break;
         }
 
         switch (c){
+            case 'k':
+                kmer_length = std::atoi(optarg);
+                break;
             case 'r':
                 ref_files.push_back(optarg);
                 break;
@@ -216,7 +227,7 @@ int main_filter(int argc, char** argv){
                 break;
             case '?':
             case 'h':
-                // nodes, edges, all stats, edges, paths
+                usage(argv);
                 exit(0);
             default:
                 abort();
@@ -227,7 +238,7 @@ int main_filter(int argc, char** argv){
 
     if (read_files.empty() & ref_files.empty()){
         std::cerr << "Please provide both a FASTA file of references and a FASTA/FASTQ file of reads." << std::endl;
-        usage();
+        usage(argv);
     }
 
     /**
@@ -338,7 +349,8 @@ int main_filter(int argc, char** argv){
 }
 int main(int argc, char** argv){
     if (argc < 2){
-        std::cerr << "No subcommand provided. Please provide a subcommand (try \" filter \"." << std::endl;
+        std::cerr << "No subcommand provided. Please provide a subcommand (try \" filter \")." << std::endl;
+        usage(argv);
         return 1;
     }
      
@@ -347,6 +359,7 @@ int main(int argc, char** argv){
     }
     else{
         std::cerr << "Invalid subcommand [" << argv[1] << "]. Please choose a valid subcommand (filter)" << std::endl;
+        usage(argv);
     }
     return 0;
 }
