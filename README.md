@@ -16,23 +16,30 @@ at a minimum a set of FASTA/FASTQ references (which may be reads) and a set of s
 
 The default behavior is to return reads which passed filtering criteria. The default filter is
 a minimum of 75 matches using a 1000 hash MinHash sketch. The sketch size can be adjusted using the `-s <SKETCH>` 
-parameter and the minimum required number of matches can be adjusted with `-m <MINMATCH>`
+parameter and the minimum required number of matches can be adjusted with `-m <MINMATCH>`. 
+Here's an example that uses a sketch size of 4000 (~40% of the Zika ref genome length) and 
+a minimum of 15 matches:
 ```
 ./rkmh2 filter -r data/zika.refs.fa -f data/z1.fq -m 10 -s 4000 > matches.fq
 ```
 
-So, if you wanted to filter the prefiltered matches.fq file to use a more stringent minimum of
-15 matches:
+The output of `rkmh2 filter` is again a FASTQf file, so if you wanted to filter the prefiltered matches.fq file to use a more stringent minimum of
+15 matches you could:
 ```
 ./rkmh2 filter -r data/zika.refs.fa -f matches.fq -m 15 -s 4000 > strict_matches.fq
 ```
 
 ### Length filtering
 You can also remove reads shorter than a certain length using `-l <MINLENGTH>. If you wanted to remove
-reads shorter than 50bp:
+reads shorter than 50bp, for example:
 ```
- time ./rkmh2 filter -r data/zika.refs.fa -f data/z1.fq -l 50 > matches.fq
+ time ./rkmh2 filter -r data/zika.refs.fa -f data/z1.fq -l 50 -m 0 > matches.fq
 ```
+Just make sure to set the `-m <MINMATCH>` parameter to zero if you want to filter exclusively
+on the length of a read.
+
+This can be combined with sketch filtering or used independently. Length filtering cannot
+yet utilize the `-z` flag to return reads *shorter* than a given length, but that *could* be a future feature.
 
 ### Performance tuning options : sketch size, threads, batch size
 Increasing the sketch size increases sensitivity for long sequences, at the cost of doing lots more work.
@@ -56,7 +63,11 @@ caused by having to read off disk and start the OpenMP loop. `-R <REFBATCH>` adj
 `-F <READBATCH>` adjusts the number of reads hashed at once.
 ```
  time ./rkmh2 filter -r data/zika.refs.fa -f data/z1.fq -m 15 -s 4000 -R 100 -F 100000 > matches.fq
+```
 
+Defaults are listed in the usage, which is accessible by:
+```
+./rkmh2 filter -h
 ```
 
 ### Inverting searches
@@ -64,5 +75,8 @@ The `-z` flag will return sequences which do not meet the minimum matches requir
 ```
  time ./rkmh2 filter -r data/zika.refs.fa -f data/z1.fq -s 4000 -m 15 -t 4 -z > non-matches.fq
 ```
+
+## Future command development
+My hope is to revive the original rkmh classify command as well as implement the kmer-counting filters applied in the paper.
 
 
