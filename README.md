@@ -34,7 +34,7 @@ reads shorter than 50bp:
  time ./rkmh2 filter -r data/zika.refs.fa -f data/z1.fq -l 50 > matches.fq
 ```
 
-### Performance tuning options : sketch size and threads 
+### Performance tuning options : sketch size, threads, batch size
 Increasing the sketch size increases sensitivity for long sequences, at the cost of doing lots more work.
 At the extreme, a very long sketch size will devolve into just exact kmer matching (where every kmer in a read is compared against
 every kmer in a reference sequence).
@@ -51,12 +51,18 @@ option to use multiple threads:
  time ./rkmh2 filter -r data/zika.refs.fa -f data/z1.fq -m 15 -s 4000 -t 4 > matches.fq
 ```
 
+The number of sequences processed per batch is also adjustable. Low batch sizes save significantly on memory use at the cost of some overhead
+caused by having to read off disk and start the OpenMP loop. `-R <REFBATCH>` adjusts the number of references hashed at once;
+`-F <READBATCH>` adjusts the number of reads hashed at once.
+```
+ time ./rkmh2 filter -r data/zika.refs.fa -f data/z1.fq -m 15 -s 4000 -R 100 -F 100000 > matches.fq
+
+```
+
 ### Inverting searches
 The `-z` flag will return sequences which do not meet the minimum matches requirements. Think of this flag like grep's `-v`:
 ```
  time ./rkmh2 filter -r data/zika.refs.fa -f data/z1.fq -s 4000 -m 15 -t 4 -z > non-matches.fq
 ```
-
-
 
 
