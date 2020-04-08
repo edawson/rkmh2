@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <getopt.h>
+#include <sstream>
 #include <cstdint>
 #include <functional>
 #include "pliib.hpp"
@@ -22,6 +23,10 @@ struct hash_result{
         hashes = new mkmh::hash_t [hashcount];
     }
     ~hash_result(){
+        //num_hashes = 0;
+        //delete [] hashes;
+    }
+    void clear(){
         num_hashes = 0;
         delete [] hashes;
     }
@@ -75,7 +80,7 @@ inline void hash_sequence(char*& sequence,
     std::size_t num_kmers = seq_len - kmer_length;
     hashes.num_hashes = num_kmers;
     hashes.hashes = new mkmh::hash_t [num_kmers];
-    #pragma omp for
+    //#pragma omp for
     for (std::size_t i = 0; i < num_kmers; ++i){
         hash_kmer(sequence + i, kmer_length, hashes.hashes[i], drop_amb_nucs);
     }
@@ -87,17 +92,40 @@ struct read_t{
     char* qual = nullptr;
     char* comment = nullptr;
     std::size_t seqlen = 0;
-    //hash_result hashes;
     read_t(){
 
     }
     ~read_t(){
+        //delete [] seq;
+        //delete [] name;
+        //delete [] qual;
+        //delete [] comment;
+    }
+
+    void purge_seq(){
+        delete [] seq;
+    }
+    void clear(){
         delete [] seq;
         delete [] name;
         delete [] qual;
         delete [] comment;
     }
+
 };
+
+std::ostream& output_kseq(klibpp::KSeq& ks, std::ostream& os){
+    if (ks.qual.empty()){
+        os << ">" << ks.name << std::endl << ks.seq;
+    }
+    else{
+        os << "@" << ks.name << std::endl <<
+            ks.seq << std::endl <<
+            "+" << ks.comment << std::endl <<
+            ks.qual;
+    }
+    return os;
+}
 
 void usage(){
     std::cout << "krmr: Filter reads using MinHash." << std::endl;
@@ -115,7 +143,9 @@ int main_filter(int argc, char** argv){
     bool allow_ambiguous = false;
     int threads = 1;
     int kmer_length = 16;
+    std::size_t min_length = 75;
     std::size_t sketch_size = 1000;
+    std::size_t min_matches = 30;
     // A hash_map to hold qname->read
     spp::sparse_hash_map<std::string, read_t> mate_cache;
     std::vector<read_t> ref_seqs;
@@ -128,8 +158,11 @@ int main_filter(int argc, char** argv){
         {
             {"help", no_argument, 0, 'h'},
             {"fasta", required_argument, 0, 'f'},
+            {"min-matches", required_argument, 0, 'm'},
             {"reference", required_argument, 0, 'r'},
+            {"min-length", required_argument, 0, 'l'},
             {"pair-qnames", required_argument, 0, 'q'},
+            {"sketch-size", required_argument, 0, 's'},
             {"ambiguous", no_argument, 0, 'N'},
             {"version", no_argument, 0, 'v'},
             {"threads", required_argument, 0, 't'},
@@ -137,7 +170,7 @@ int main_filter(int argc, char** argv){
         };
     
         int option_index = 0;
-        c = getopt_long(argc, argv, "hr:f:q:t:Nv", long_options, &option_index);
+        c = getopt_long(argc, argv, "hm:s:r:f:q:t:l:Nv", long_options, &option_index);
         if (c == -1){
             break;
         }
@@ -145,6 +178,9 @@ int main_filter(int argc, char** argv){
         switch (c){
             case 'r':
                 ref_files.push_back(optarg);
+                break;
+            case 'm':
+                min_matches = std::atoi(optarg);
                 break;
             case 'f':
                 read_files.push_back(optarg);
@@ -155,8 +191,14 @@ int main_filter(int argc, char** argv){
             case 'N':
                 allow_ambiguous = true;
                 break;
+            case 's':
+                sketch_size = std::atoi(optarg);
+                break;
             case 't':
                 threads = std::atoi(optarg);
+                break;
+            case 'l':
+                min_length = std::atoi(optarg);
                 break;
             case '?':
             case 'h':
@@ -192,40 +234,86 @@ int main_filter(int argc, char** argv){
             std::vector<hash_result> curr_ref_fi_hashes(rsize);
             #pragma omp parallel for
             for (std::size_t i = 0; i < rsize; ++i){
-                klibpp::KSeq rec = records[i];
-                pliib::strcopy(rec.name.c_str(), curr_ref_fi_reads[i].name);
-                //pliib::strcopy(rec.seq.c_str(), curr_ref_fi_reads[i].seq);
-                //curr_ref_fi_reads[i].seqlen = rec.seq.size();
-                //hash_sequence(curr_ref_fi_reads[i].seq,
-                //        curr_ref_fi_reads[i].seqlen,
-                //        kmer_length,
-                //        curr_ref_fi_hashes[i],
-                //        allow_ambiguous);
-                //delete [] curr_ref_fi_reads[i].name;
-                //curr_ref_fi_hashes[i].sketch(sketch_size);
+                pliib::strcopy(records.at(i).name.c_str(), curr_ref_fi_reads.at(i).name);
+                pliib::strcopy(records.at(i).seq.c_str(), curr_ref_fi_reads.at(i).seq);
+                curr_ref_fi_reads[i].seqlen = records.at(i).seq.size();
+                hash_sequence(curr_ref_fi_reads[i].seq,
+                        curr_ref_fi_reads[i].seqlen,
+                        kmer_length,
+                        curr_ref_fi_hashes[i],
+                        allow_ambiguous);
+                curr_ref_fi_reads.at(i).purge_seq();            
+                curr_ref_fi_hashes[i].sketch(sketch_size);
             }
 
-            #pragma omp critical
+            //#pragma omp critical
             {
                 ref_seqs.insert(ref_seqs.end(), curr_ref_fi_reads.begin(), curr_ref_fi_reads.end());
-                //ref_hashes.insert(ref_hashes.end(), curr_ref_fi_hashes.begin(), curr_ref_fi_hashes.end());
+                ref_hashes.insert(ref_hashes.end(), curr_ref_fi_hashes.begin(), curr_ref_fi_hashes.end());
             }
             records = iss.read(10);
         }
     }
 
+    std::size_t n_ref_seqs = ref_seqs.size();
     std::cerr << "Processed " << ref_files.size() <<
-        " files with " << ref_seqs.size() <<
+        " files with " << n_ref_seqs <<
         " reference sequences." << std::endl;
     #ifdef DEBUG_KRMR
     #endif 
 
+    std::size_t total_reads = 0;
     for(std::size_t i = 0; i < read_files.size(); ++i){
-
         klibpp::SeqStreamIn rss(read_files[i].c_str());
         std::vector<klibpp::KSeq> records = rss.read(2000);
-
+        while (!records.empty()){
+            std::size_t rsize = records.size();
+            std::vector<read_t> curr_reads(rsize);
+            std::vector<hash_result> curr_read_hashes(rsize);
+            #pragma omp parallel for
+            for (std::size_t i = 0; i < rsize; ++i){
+                std::ostringstream st;
+                char* seq;
+                std::size_t seq_len = records.at(i).seq.size();
+                if (seq_len >= min_length){
+                    pliib::strcopy(records.at(i).seq.c_str(), seq);
+                    hash_sequence(seq,
+                        seq_len,
+                        kmer_length,
+                        curr_read_hashes.at(i),
+                        allow_ambiguous);
+                    delete [] seq;
+                    curr_read_hashes.at(i).sketch(sketch_size);
+                    for (std::size_t j = 0; j < n_ref_seqs; ++j){
+                        int inter = 0;
+                        mkmh::hash_intersection_size(ref_hashes[j].hashes, ref_hashes[j].num_hashes,
+                                curr_read_hashes.at(i).hashes, curr_read_hashes.at(i).num_hashes, inter);
+                        //std::cerr << inter << std::endl;
+                        if (inter >= min_matches){
+                            //std::cerr << "Record passed" << std::endl;
+                            output_kseq(records.at(i), st);
+                            st << std::endl;
+                            //std::cout << records[i] << std::endl;;
+                            std::cout << st.str();
+                        }
+                    }
+                }
+                else{
+                    st << 
+                        "Read filtered for length. QNAME: " << 
+                        records.at(i).name << 
+                        ", length: " << 
+                        seq_len << std::endl;
+                    std::cerr << st.str();
+                }
+            }
+            total_reads += rsize;
+            std::cerr << "Processed " << total_reads << "  reads so far." << std::endl;
+            records = rss.read(2000);
+        }
     }
+
+    std::cerr << "Processed " << total_reads << " total reads from " << read_files.size() << " files." << std::endl;
 
 
     return 0;
