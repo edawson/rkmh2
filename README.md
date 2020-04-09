@@ -21,7 +21,7 @@ original [rkmh package](https://github.com/edawson/rkmh) and [accompanying paper
 - [ ] no `-I/-M` depth-based filters (which were
     the major improvements of rkmh over other methods to begin with)
 - [ ] no streaming input of reads yet
-- [ ] code not yet profiled
+- [ ] code not yet profiled (but as fast as original rkmh)
 - [ ] no HPV16-specific features
 
 ### Features to come
