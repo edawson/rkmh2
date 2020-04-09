@@ -27,6 +27,7 @@ original [rkmh package](https://github.com/edawson/rkmh) and [accompanying paper
 - [ ] paired-end read hashing / filtering
 - [ ] replace the original `rkmh classify` command
 - [ ] further speed improvements, new hashing algos, and more parallelization
+- [ ] automated tests (in the works) and a cleaner repository.
 
 
 ## filter : select/filter reads matching a set of sequences
