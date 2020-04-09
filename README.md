@@ -7,6 +7,20 @@ rkmh2: Kmer-based read filtering using MinHash
 **rkmh2** is a reimplementation of (some) of the algorithms for MinHash-based read filtering from the
 original [rkmh package](https://github.com/edawson/rkmh) and [accompanying paper](https://doi.org/10.1186/s12859-019-2918-y). It focuses on improved stability, lower memory usage, usability and speed.
 
+### Improvements over the original rkmh
+- [x] batched ref / read hashing (greatly reduces memory usage)
+- [x] better code flow / fewer branches (speed - more gains to be made, too)
+- [x] safer code (I learned more C++)
+- [x] simpler code - we're down to essentially four header files and one cpp.
+- [x] big improvements in memory usage (WGS human, 30k hashes per sequence on standard laptops)
+- [x] Native fastq output for filter without ever saving the sequences.
+
+### Features to come
+- [ ] paired-end read hashing / filtering
+- [ ] replace the original `rkmh classify` command
+- [ ] further speed improvements, new hashing algos, and more parallelization
+
+
 ## filter : select/filter reads matching a set of sequences
 Currently only one command is supported: `rkmh2 filter`
 
