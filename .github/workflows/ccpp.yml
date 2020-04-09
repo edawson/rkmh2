@@ -1,4 +1,4 @@
-name: C/C++ build/test for kramer
+name: C/C++ build/test for rkmh2
 
 on:
   push:
