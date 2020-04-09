@@ -6,7 +6,6 @@ rkmh2: Kmer-based read filtering using MinHash
 
 [docker: hpobiolab/rkmh2](https://hub.docker.com/repository/docker/erictdawson/rkmh2)
 
-![docker image size](https://img.shields.io/docker/image-size/edawson/rkmh2?label=rkmh2%20Docker%20image%20size&style=plastic)
 
 ## Introduction
 **rkmh2** is a reimplementation of (some) of the algorithms for MinHash-based read filtering from the
