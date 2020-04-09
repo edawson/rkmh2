@@ -10,7 +10,7 @@
 #include "mkmh.hpp"
 #include "seqio.hpp"
 
-#define DEBUG_KRMR
+//#define DEBUG_KRMR
 
 struct hash_result{
     std::size_t num_hashes;
@@ -35,9 +35,14 @@ struct hash_result{
     }
     void sketch(std::size_t sketch_size = 1000){
         sort();
-        std::size_t s = num_hashes < sketch_size ? num_hashes : sketch_size;
+        std::size_t first_valid_index = 0;
+        while (hashes[first_valid_index] == 0){
+            ++first_valid_index;
+        }
+        std::size_t val_count = num_hashes - first_valid_index;
+        std::size_t s = val_count < sketch_size ? val_count : sketch_size;
         mkmh::hash_t* sketch = new mkmh::hash_t[s];
-        for (std::size_t i = 0; i < s; ++i){
+        for (std::size_t i = first_valid_index; i < s; ++i){
             sketch[i] = hashes[i];
         }
         delete [] hashes;
@@ -57,7 +62,7 @@ inline void hash_kmer(char* kmer,
             return;
         }
     }
-    
+   
     uint32_t rhash[4];
     uint32_t fhash[4];
     
@@ -75,7 +80,13 @@ inline void hash_sequence(char*& sequence,
         const std::size_t& seq_len,
         const int& kmer_length,
         hash_result& hashes,
-        bool drop_amb_nucs = true){
+        bool drop_amb_nucs = true,
+        bool enforce_capital_nucs = true){
+    
+    if (enforce_capital_nucs){
+        pliib::to_upper(sequence, seq_len);
+    }
+ 
    
     std::size_t num_kmers = seq_len - kmer_length;
     hashes.num_hashes = num_kmers;
@@ -298,7 +309,7 @@ int main_filter(int argc, char** argv){
             #pragma omp parallel for
             for (std::size_t i = 0; i < rsize; ++i){
                 std::ostringstream st;
-                char* seq;
+                char* seq = nullptr;
                 std::size_t seq_len = records.at(i).seq.size();
                 if (seq_len >= min_length){
                     pliib::strcopy(records.at(i).seq.c_str(), seq);
@@ -307,7 +318,6 @@ int main_filter(int argc, char** argv){
                         kmer_length,
                         curr_read_hashes.at(i),
                         allow_ambiguous);
-                    delete [] seq;
                     curr_read_hashes.at(i).sketch(sketch_size);
                     for (std::size_t j = 0; j < n_ref_seqs; ++j){
                         int inter = 0;
@@ -324,6 +334,7 @@ int main_filter(int argc, char** argv){
                             break;
                         }
                     }
+                    curr_read_hashes.at(i).clear();
                 }
                 else{
                     st << 
@@ -334,6 +345,7 @@ int main_filter(int argc, char** argv){
                     std::cerr << st.str();
                     st.str("");
                 }
+                delete [] seq;
             }
             total_reads += rsize;
             std::cerr << "Processed " << total_reads << "  reads so far." << std::endl;
