@@ -8,6 +8,19 @@ rkmh2: Kmer-based read filtering using MinHash
 **rkmh2** is a reimplementation of (some) of the algorithms for MinHash-based read filtering from the
 original [rkmh package](https://github.com/edawson/rkmh) and [accompanying paper](https://doi.org/10.1186/s12859-019-2918-y). It focuses on improved stability, lower memory usage, usability and speed.
 
+### Installation
+System Requirements:
+- a C++14 compatible compiler (gcc will do)
+- zlib
+
+```
+git clone --recursive https://github.com/edawson/rkmh2
+cd rkmh2
+make
+```
+
+**Docker**: [erictdawson/rkmh2](https://hub.docker.com/repository/docker/erictdawson/rkmh2) or [hpobiolab/rkmh2](https://hub.docker.com/repository/docker/hpobiolab/rkmh2)
+
 ### Improvements over the original rkmh
 - [x] batched ref / read hashing (greatly reduces memory usage)
 - [x] better code flow / fewer branches (speed - more gains to be made, too)
