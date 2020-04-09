@@ -2,7 +2,11 @@ rkmh2: Kmer-based read filtering using MinHash
 ----------------------------------------------
 
 ![C/C++ build/test for rkmh2](https://github.com/edawson/rkmh2/workflows/C/C++%20build/test%20for%20kramer/badge.svg)
-![docker: hpobiolab/rkmh2](https://img.shields.io/docker/image-size/hpobiolab/rkmh2)
+
+
+[docker: hpobiolab/rkmh2](https://hub.docker.com/repository/docker/erictdawson/rkmh2)
+
+![docker image size](https://img.shields.io/docker/image-size/edawson/rkmh2?label=rkmh2%20Docker%20image%20size&style=plastic)
 
 ## Introduction
 **rkmh2** is a reimplementation of (some) of the algorithms for MinHash-based read filtering from the
