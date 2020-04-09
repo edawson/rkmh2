@@ -15,6 +15,14 @@ original [rkmh package](https://github.com/edawson/rkmh) and [accompanying paper
 - [x] big improvements in memory usage (WGS human, 30k hashes per sequence on standard laptops)
 - [x] Native fastq output for filter without ever saving the sequences.
 
+### Notably missing
+- [ ] no `rkmh classify` or `stream` replacements
+- [ ] no `-I/-M` depth-based filters (which were
+    the major improvements of rkmh over other methods to begin with)
+- [ ] no streaming input of reads yet
+- [ ] code not yet profiled
+- [ ] no HPV16-specific features
+
 ### Features to come
 - [ ] paired-end read hashing / filtering
 - [ ] replace the original `rkmh classify` command
