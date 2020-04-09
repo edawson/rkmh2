@@ -46,6 +46,9 @@ make
 - [ ] further speed improvements, new hashing algos, and more parallelization
 - [ ] automated tests (in the works) and a cleaner repository.
 
+The rkmh2 filter command is roughly 15% faster than the original rkmh filter version
+and at least 30% more memory efficient on the AllPave-1088 test dataset
+(2015 Macbook Pro 13 inch, Core i5 2.9Ghz, 2 CPUs/4 threads, 8GB of RAM).
 
 ## filter : select/filter reads matching a set of sequences
 Currently only one command is supported: `rkmh2 filter`
@@ -63,7 +66,7 @@ a minimum of 15 matches:
 ./rkmh2 filter -r data/zika.refs.fa -f data/z1.fq -m 10 -s 4000 > matches.fq
 ```
 
-The output of `rkmh2 filter` is again a FASTQf file, so if you wanted to filter the prefiltered matches.fq file to use a more stringent minimum of
+The output of `rkmh2 filter` is again a FASTQ file, so if you wanted to filter the prefiltered matches.fq file to use a more stringent minimum of
 15 matches you could:
 ```
 ./rkmh2 filter -r data/zika.refs.fa -f matches.fq -m 15 -s 4000 > strict_matches.fq
