@@ -51,52 +51,6 @@ struct hash_result{
     }
 };
 
-inline void hash_kmer(char* kmer,
-        const std::size_t& kmer_len,
-        mkmh::hash_t& ret,
-        bool drop_amb_nucs = true){
-
-    if (drop_amb_nucs){
-        if (!pliib::canonical(kmer, kmer_len)){
-            ret = 0;
-            return;
-        }
-    }
-   
-    uint32_t rhash[4];
-    uint32_t fhash[4];
-    
-    mkmh::mmh3::MurmurHash3_x64_128(kmer, kmer_len, 42, fhash);
-    pliib::reverse_inplace(kmer, kmer_len);
-    mkmh::mmh3::MurmurHash3_x64_128(kmer, kmer_len, 42, rhash);
-    pliib::reverse_inplace(kmer, kmer_len);
-
-    mkmh::hash_t tmp_fwd = static_cast<uint64_t>(fhash[0]) << 32 | fhash[1];
-    mkmh::hash_t tmp_rev = static_cast<uint64_t>(rhash[0]) << 32 | rhash[1];
-    ret = tmp_fwd < tmp_rev ? tmp_fwd : tmp_rev;
-}
-
-inline void hash_sequence(char*& sequence,
-        const std::size_t& seq_len,
-        const int& kmer_length,
-        hash_result& hashes,
-        bool drop_amb_nucs = true,
-        bool enforce_capital_nucs = true){
-    
-    if (enforce_capital_nucs){
-        pliib::to_upper(sequence, seq_len);
-    }
- 
-   
-    std::size_t num_kmers = seq_len - kmer_length;
-    hashes.num_hashes = num_kmers;
-    hashes.hashes = new mkmh::hash_t [num_kmers];
-    //#pragma omp for
-    for (std::size_t i = 0; i < num_kmers; ++i){
-        hash_kmer(sequence + i, kmer_length, hashes.hashes[i], drop_amb_nucs);
-    }
-}
-
 struct read_t{
     char* seq = nullptr;
     char* name = nullptr;
@@ -136,6 +90,95 @@ std::ostream& output_kseq(klibpp::KSeq& ks, std::ostream& os){
             ks.qual;
     }
     return os;
+}
+
+
+inline void hash_kmer(char* kmer,
+        const std::size_t& kmer_len,
+        mkmh::hash_t& ret,
+        bool drop_amb_nucs = true){
+
+    if (drop_amb_nucs){
+        if (!pliib::canonical(kmer, kmer_len)){
+            ret = 0;
+            return;
+        }
+    }
+
+    std::uint64_t fhash[2];
+    std::uint64_t rhash[2];
+
+    mkmh::mmh3::MurmurHash3_x64_128(kmer, kmer_len, 42, fhash);
+    // TODO: is this really thread / memory safe? It seems like it would
+    // alter the underlying string ...
+    pliib::reverse_inplace(kmer, kmer_len);
+    //std::cerr << std::string(kmer, kmer_len) << std::endl;
+    mkmh::mmh3::MurmurHash3_x64_128(kmer, kmer_len, 42, rhash);
+    pliib::reverse_inplace(kmer, kmer_len);
+    //std::cerr << std::string(kmer, kmer_len) << std::endl;
+
+    mkmh::hash_t tmp_fwd = static_cast<uint64_t>(fhash[0]);
+    mkmh::hash_t tmp_rev = static_cast<uint64_t>(rhash[0]);
+    ret = tmp_fwd < tmp_rev ? tmp_fwd : tmp_rev;
+}
+
+inline void hash_sequence(char*& sequence,
+        const std::size_t& seq_len,
+        const int& kmer_length,
+        hash_result& hashes,
+        bool drop_amb_nucs = true,
+        bool enforce_capital_nucs = true){
+
+    if (enforce_capital_nucs){
+        pliib::to_upper(sequence, seq_len);
+    }
+
+
+    std::size_t num_kmers = seq_len - kmer_length;
+    hashes.num_hashes = num_kmers;
+    hashes.hashes = new mkmh::hash_t [num_kmers];
+    //#pragma omp for
+    for (std::size_t i = 0; i < num_kmers; ++i){
+        hash_kmer(sequence + i, kmer_length, hashes.hashes[i], drop_amb_nucs);
+    }
+}
+
+inline void hash_reference_sequences(std::vector<std::string> ref_files,
+        std::vector<read_t>& ref_seqs,
+        std::vector<hash_result>& ref_hashes){
+
+    for(std::size_t i = 0; i < ref_files.size(); ++i){
+        klibpp::SeqStreamIn iss(ref_files[i].c_str());
+        std::vector<klibpp::KSeq> records = iss.read(ref_batch);
+        while (!records.empty()){
+            #ifdef DEBUG_KRMR
+                std::cerr << " records size: " << records.size() << std::endl;
+            #endif
+            std::size_t rsize = records.size();
+            std::vector<read_t> curr_ref_fi_reads(rsize);
+            std::vector<hash_result> curr_ref_fi_hashes(rsize);
+            #pragma omp parallel for
+            for (std::size_t i = 0; i < rsize; ++i){
+                pliib::strcopy(records.at(i).name.c_str(), curr_ref_fi_reads.at(i).name);
+                pliib::strcopy(records.at(i).seq.c_str(), curr_ref_fi_reads.at(i).seq);
+                curr_ref_fi_reads[i].seqlen = records.at(i).seq.size();
+                hash_sequence(curr_ref_fi_reads[i].seq,
+                        curr_ref_fi_reads[i].seqlen,
+                        kmer_length,
+                        curr_ref_fi_hashes[i],
+                        allow_ambiguous);
+                curr_ref_fi_reads.at(i).purge_seq();
+                curr_ref_fi_hashes[i].sketch(sketch_size);
+            }
+
+            //#pragma omp critical
+            {
+                ref_seqs.insert(ref_seqs.end(), curr_ref_fi_reads.begin(), curr_ref_fi_reads.end());
+                ref_hashes.insert(ref_hashes.end(), curr_ref_fi_hashes.begin(), curr_ref_fi_hashes.end());
+            }
+            records = iss.read(ref_batch);
+        }
+    }
 }
 
 void usage(char** argv){
@@ -192,7 +235,7 @@ int main_filter(int argc, char** argv){
             {"threads", required_argument, 0, 't'},
             {0,0,0,0}
         };
-    
+
         int option_index = 0;
         c = getopt_long(argc, argv, "hzk:R:F:m:s:r:f:q:t:l:Nv", long_options, &option_index);
         if (c == -1){
@@ -258,17 +301,17 @@ int main_filter(int argc, char** argv){
     //std::vector<read_t> curr_ref_fi_reads;
     //std::vector<hash_result> curr_ref_fi_hashes;
     for(std::size_t i = 0; i < ref_files.size(); ++i){
-       
+
         klibpp::SeqStreamIn iss(ref_files[i].c_str());
         std::vector<klibpp::KSeq> records = iss.read(ref_batch);
         while (!records.empty()){
-            #ifdef DEBUG_KRMR
+#ifdef DEBUG_KRMR
             std::cerr << " records size: " << records.size() << std::endl;
-            #endif
+#endif
             std::size_t rsize = records.size();
             std::vector<read_t> curr_ref_fi_reads(rsize);
             std::vector<hash_result> curr_ref_fi_hashes(rsize);
-            #pragma omp parallel for
+#pragma omp parallel for
             for (std::size_t i = 0; i < rsize; ++i){
                 pliib::strcopy(records.at(i).name.c_str(), curr_ref_fi_reads.at(i).name);
                 pliib::strcopy(records.at(i).seq.c_str(), curr_ref_fi_reads.at(i).seq);
@@ -295,8 +338,8 @@ int main_filter(int argc, char** argv){
     std::cerr << "Processed " << ref_files.size() <<
         " files with " << n_ref_seqs <<
         " reference sequences." << std::endl;
-    #ifdef DEBUG_KRMR
-    #endif 
+#ifdef DEBUG_KRMR
+#endif 
 
     std::size_t total_reads = 0;
     for(std::size_t i = 0; i < read_files.size(); ++i){
@@ -306,18 +349,19 @@ int main_filter(int argc, char** argv){
             std::size_t rsize = records.size();
             std::vector<read_t> curr_reads(rsize);
             std::vector<hash_result> curr_read_hashes(rsize);
-            #pragma omp parallel for
+#pragma omp parallel for
             for (std::size_t i = 0; i < rsize; ++i){
                 std::ostringstream st;
                 char* seq = nullptr;
                 std::size_t seq_len = records.at(i).seq.size();
                 if (seq_len >= min_length){
-                    pliib::strcopy(records.at(i).seq.c_str(), seq);
+                    //pliib::strcopy(const_cast<char*>(records.at(i).seq.c_str()), seq);
+                    seq = const_cast<char*>(records.at(i).seq.c_str());
                     hash_sequence(seq,
-                        seq_len,
-                        kmer_length,
-                        curr_read_hashes.at(i),
-                        allow_ambiguous);
+                            seq_len,
+                            kmer_length,
+                            curr_read_hashes.at(i),
+                            allow_ambiguous);
                     curr_read_hashes.at(i).sketch(sketch_size);
                     for (std::size_t j = 0; j < n_ref_seqs; ++j){
                         int inter = 0;
@@ -345,7 +389,7 @@ int main_filter(int argc, char** argv){
                     std::cerr << st.str();
                     st.str("");
                 }
-                delete [] seq;
+                //delete [] seq;
             }
             total_reads += rsize;
             std::cerr << "Processed " << total_reads << "  reads so far." << std::endl;
@@ -355,19 +399,33 @@ int main_filter(int argc, char** argv){
 
     std::cerr << "Processed " << total_reads << " total reads from " << read_files.size() << " files." << std::endl;
 
-
     return 0;
-
 }
+
+int main_sketch(int argc, char** argv){
+    return 0;
+}
+
+int main_classify(int argc, char** argv){
+    return 0;
+}
+
+
 int main(int argc, char** argv){
     if (argc < 2){
         std::cerr << "No subcommand provided. Please provide a subcommand (try \" filter \")." << std::endl;
         usage(argv);
         return 1;
     }
-     
+
     if (strcmp(argv[1], "filter") == 0){
         return main_filter(argc, argv);
+    }
+    else if (strcmp(argv[1], "classify") == 0){
+
+    }
+    else if (strcmp(argv[1], "sketch") == 0){
+
     }
     else{
         std::cerr << "Invalid subcommand [" << argv[1] << "]. Please choose a valid subcommand (filter)" << std::endl;
