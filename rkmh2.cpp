@@ -145,7 +145,12 @@ inline void hash_sequence(char*& sequence,
 
 inline void hash_reference_sequences(std::vector<std::string> ref_files,
         std::vector<read_t>& ref_seqs,
-        std::vector<hash_result>& ref_hashes){
+        std::vector<hash_result>& ref_hashes,
+        std::size_t kmer_length = 16,
+        std::size_t sketch_size = 1000,
+        bool allow_ambiguous = false,
+        std::size_t ref_batch = 5
+        ){
 
     for(std::size_t i = 0; i < ref_files.size(); ++i){
         klibpp::SeqStreamIn iss(ref_files[i].c_str());
@@ -296,44 +301,24 @@ int main_filter(int argc, char** argv){
     }
 
     /**
-     * Read in an hash all the reference files.
+     * Read in and hash all the reference files.
+     * hash_reference_sequences(std::vector<std::string> ref_files,
+        std::vector<read_t>& ref_seqs,
+        std::vector<hash_result>& ref_hashes,
+        std::size_t kmer_length = 16,
+        std::size_t sketch_size = 1000,
+        bool allow_ambiguous = false,
+        std::size_t ref_batch = 5
+        ){
      */
-    //std::vector<read_t> curr_ref_fi_reads;
-    //std::vector<hash_result> curr_ref_fi_hashes;
-    for(std::size_t i = 0; i < ref_files.size(); ++i){
-
-        klibpp::SeqStreamIn iss(ref_files[i].c_str());
-        std::vector<klibpp::KSeq> records = iss.read(ref_batch);
-        while (!records.empty()){
-#ifdef DEBUG_KRMR
-            std::cerr << " records size: " << records.size() << std::endl;
-#endif
-            std::size_t rsize = records.size();
-            std::vector<read_t> curr_ref_fi_reads(rsize);
-            std::vector<hash_result> curr_ref_fi_hashes(rsize);
-#pragma omp parallel for
-            for (std::size_t i = 0; i < rsize; ++i){
-                pliib::strcopy(records.at(i).name.c_str(), curr_ref_fi_reads.at(i).name);
-                pliib::strcopy(records.at(i).seq.c_str(), curr_ref_fi_reads.at(i).seq);
-                curr_ref_fi_reads[i].seqlen = records.at(i).seq.size();
-                hash_sequence(curr_ref_fi_reads[i].seq,
-                        curr_ref_fi_reads[i].seqlen,
-                        kmer_length,
-                        curr_ref_fi_hashes[i],
-                        allow_ambiguous);
-                curr_ref_fi_reads.at(i).purge_seq();            
-                curr_ref_fi_hashes[i].sketch(sketch_size);
-            }
-
-            //#pragma omp critical
-            {
-                ref_seqs.insert(ref_seqs.end(), curr_ref_fi_reads.begin(), curr_ref_fi_reads.end());
-                ref_hashes.insert(ref_hashes.end(), curr_ref_fi_hashes.begin(), curr_ref_fi_hashes.end());
-            }
-            records = iss.read(ref_batch);
-        }
-    }
-
+    hash_reference_sequences(ref_files,
+            ref_seqs,
+            ref_hashes,
+            kmer_length,
+            sketch_size,
+            allow_ambiguous,
+            ref_batch);
+    
     std::size_t n_ref_seqs = ref_seqs.size();
     std::cerr << "Processed " << ref_files.size() <<
         " files with " << n_ref_seqs <<
